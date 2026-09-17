@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light" />
+<link rel="icon" href="data:,">
 <title>Kasir — Point of Sale Online</title>
 <!--
   ============================================================================
@@ -4344,7 +4345,18 @@ function fatal(title, detail){
     '<p class="small">' + esc(detail) + '</p></div></div>';
 }
 
+/* Layar apa pun lebih baik daripada layar putih: kalau penyalaan gagal,
+   sebabnya ditulis di layar, bukan hanya di konsol. */
+window.addEventListener('error', function(ev){
+  if (document.getElementById('lock') && !document.getElementById('lock').innerHTML && (!App || !App.user)){
+    fatal('Aplikasi gagal dijalankan', (ev.message || 'galat tidak dikenal') +
+          ' — ' + (ev.filename || '') + ':' + (ev.lineno || 0));
+  }
+});
+
 (async function boot(){
+ try {
+  splash('Menyiapkan…', 'Menghubungi server.');
   if (!window.supabase || !window.supabase.createClient){
     fatal('Pustaka Supabase gagal dimuat',
           'Periksa sambungan internet lalu muat ulang halaman. Aplikasi ini memerlukan internet karena datanya ada di server.');
@@ -4383,6 +4395,9 @@ function fatal(title, detail){
 
   // Sambungkan ulang printer yang sudah pernah diizinkan (kalau peramban mengizinkan).
   setTimeout(function(){ if (PRN.cfg.deviceName) prnReconnect().catch(function(){}); }, 1200);
+ } catch (ex){
+  fatal('Aplikasi gagal dijalankan', (ex && (ex.message || ex.toString())) || 'galat tidak dikenal');
+ }
 })();
 </script>
 </body>
