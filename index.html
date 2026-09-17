@@ -36,6 +36,7 @@
    Sistem token. Ubah di sini kalau ingin mengganti tampilan.
    --------------------------------------------------------------- */
 :root{
+  color-scheme: light only;
   --paper:#F4F6F3;
   --surface:#FFFFFF;
   --ink:#10201C;
@@ -58,6 +59,13 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
+html{color-scheme:light only}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#F4F6F3; --surface:#FFFFFF; --ink:#10201C; }
+}
+@media (forced-colors: active){
+  body,.lock,.lock-card,#app,.card,.rail,.topbar,.main{ forced-color-adjust:none; }
+}
 body{
   font-family:var(--sans);
   background:var(--paper);
