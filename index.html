@@ -267,6 +267,7 @@ tr:last-child td{border-bottom:0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
+<div id="boot-banner" style="position:fixed;inset:0;z-index:99999;background:#08453A;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font:15px/1.5 system-ui,sans-serif;padding:24px">Memuat aplikasi kasir…<br><span style="font-size:12px;opacity:.75">Kalau tulisan ini tidak hilang dalam beberapa detik, berkas yang tersimpan di server bukan yang terbaru.</span></div>
 <div id="app" hidden></div>
 <div id="lock"></div>
 <div id="modal-root"></div>
@@ -274,6 +275,7 @@ tr:last-child td{border-bottom:0}
 <div id="receipt-area" aria-hidden="true"></div>
 <script>
 "use strict";
+(function(){ var b = document.getElementById("boot-banner"); if (b) b.remove(); })();
 /* ===========================================================================
    1. UTILITAS UANG  — semua nominal adalah INTEGER rupiah. Tidak ada float.
    =========================================================================== */
