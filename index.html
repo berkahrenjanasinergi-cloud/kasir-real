@@ -262,56 +262,6 @@ tr:last-child td{border-bottom:0}
   #receipt-area{display:block!important}
   @page{margin:4mm}
 }
-/* ===== Penyesuaian tablet & layar sentuh ===== */
-.modal:focus{outline:none}
-.btn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
-.cat-bar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
-.cat-bar button{flex:0 0 auto;white-space:nowrap}
-.seg{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line-2);overflow-x:auto}
-.seg button,.pm button{flex:0 0 auto;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:14px;min-height:44px;white-space:nowrap}
-.seg button[aria-pressed="true"],.pm button[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:600}
-.prod{position:relative}
-.prod:active{transform:scale(.97)}
-.prod.in{border-color:var(--brand);background:var(--brand-tint)}
-.qb{position:absolute;top:7px;right:7px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:var(--brand);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.paygrid{display:grid;grid-template-columns:1fr;gap:16px}
-.payrow{border:1.5px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}
-.payrow.on{border-color:var(--brand);background:var(--brand-tint)}
-.pm{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.payamt{display:flex;align-items:center;gap:8px;font-size:28px;font-weight:700}
-.payamt b{flex:1;text-align:right;font-variant-numeric:tabular-nums}
-.npad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-.npad button{height:62px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:22px;font-weight:600}
-.npad button:active{background:var(--brand-tint)}
-.done{text-align:center;padding:6px 0 2px}
-.done .ok{width:64px;height:64px;border-radius:50%;background:var(--brand-tint);color:var(--brand);font-size:34px;line-height:64px;margin:0 auto 10px}
-.done .big{font-size:36px;font-weight:700;letter-spacing:-.02em}
-.totals [data-orderdisc]{min-height:36px!important;padding:0 6px!important;color:var(--brand-2)}
-@media (min-width:700px){
-  .paygrid{grid-template-columns:1.1fr 1fr}
-  .pos{grid-template-columns:minmax(0,1fr) 350px}
-  .cart{position:sticky;top:76px;max-height:calc(100vh - 92px)}
-  .prod-grid{grid-template-columns:repeat(auto-fill,minmax(136px,1fr))}
-}
-@media (min-width:700px) and (max-width:1180px){
-  .rail{width:84px;flex:0 0 84px}
-  .rail-head{display:none}
-  .rail-nav button{flex-direction:column;gap:2px;font-size:11px;text-align:center;padding:8px 2px;min-height:58px;justify-content:center}
-  .rail-foot button{font-size:11px;text-align:center;padding:10px 2px}
-  .view{padding:16px 14px 70px}
-}
-@media (pointer:coarse){
-  body{font-size:16px}
-  .btn{min-height:48px;padding:10px 16px;font-size:15px}
-  .btn-sm{min-height:44px;padding:8px 14px;font-size:14px}
-  .btn-lg{min-height:60px;font-size:18px}
-  .input,select.input,textarea.input{min-height:48px;font-size:16px}
-  .cat-bar button{min-height:44px;padding:8px 16px;font-size:14px}
-  .prod{min-height:100px}.prod .pn{font-size:15px}.prod .pp{font-size:15px}
-  .qty button{width:44px;height:44px;font-size:20px}
-  .qty input{width:56px;height:44px;font-size:16px}
-  .pinpad button{height:64px}
-}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -544,8 +494,6 @@ function parseCSV(text){
   return rows.filter(function(r){ return r.some(function(c){ return String(c).trim() !== ''; }); });
 }
 
-const IS_TOUCH = window.matchMedia('(pointer: coarse), (hover: none)').matches;
-
 /* Hash PIN: PBKDF2-SHA256. Tidak pernah menyimpan PIN apa adanya. */
 async function hashPin(pin, saltHex){
   const enc = new TextEncoder();
@@ -719,16 +667,6 @@ async function dbDel(name, key){
   cacheDel(name, key);
 }
 
-/* Ubah data produk TANPA menyentuh kolom stok. Stok hanya boleh berubah lewat
-   fungsi penjualan/koreksi di server; kalau ikut terkirim, angka lama di layar
-   bisa menimpa stok yang baru saja berkurang karena penjualan di perangkat lain. */
-async function patchProduct(rec){
-  const row = toRow('products', rec); delete row.stock; delete row.created_at;
-  must(await CLOUD.sb.from('products').update(row).eq('id', rec.id));
-  const cur = await dbGet('products', rec.id);
-  cacheSet('products', Object.assign({}, rec, { stock: cur ? cur.stock : rec.stock }));
-}
-
 /* ---- Penulisan berkelompok ----
    Bentuknya sengaja dibuat sama dengan transaksi IndexedDB versi lama supaya
    halaman produk, impor CSV, pemulihan cadangan, dan penghapusan data tidak
@@ -857,8 +795,6 @@ function scheduleRemoteRender(){
       // Keranjang milik perangkat ini — jangan disentuh. Cukup segarkan daftar produk.
       if ($('#pos-grid')) { renderPosCats(); renderPosGrid(); }
     } else {
-      const a = document.activeElement;     // sedang mengetik? tunda, jangan bongkar halaman
-      if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest('#view')) return;
       renderView();
     }
   }, 450);
@@ -1304,7 +1240,6 @@ async function shiftSummary(shiftId){
       if (p.method === 'Tunai') cashSales += p.amount; else nonCashSales += p.amount;
     });
     changeGiven += o.change || 0;
-    if (o.change && byMethod['Tunai'] != null) byMethod['Tunai'] -= o.change;
   });
   // Refund yang dibayarkan tunai pada shift ini mengurangi isi laci.
   let cashRefunds = 0, nonCashRefunds = 0;
@@ -1365,40 +1300,40 @@ function toast(msg, bad){
   setTimeout(function(){ el.remove(); }, bad ? 4200 : 2600);
 }
 
-const _mstack = [];
-let _modalResolve = null;          // true bila ada dialog terbuka (dibaca bagian lain)
+let _modalResolve = null;
 function closeModal(value){
-  const top = _mstack.pop(); if (!top) return;
-  top.el.remove();
-  _modalResolve = _mstack.length ? true : null;
-  top.resolve(value);
+  const r = _modalResolve; _modalResolve = null;
+  const root = $('#modal-root');
+  const fresh = root.cloneNode(false);   // buang seluruh listener dialog sebelumnya
+  root.replaceWith(fresh);
+  if (r) r(value);
 }
-/** Dialog bertumpuk: dialog baru muncul di atas, menutupnya mengembalikan dialog sebelumnya. */
+/**
+ * Menampilkan dialog. opts = { title, body, footer, wide, onMount }
+ * Mengembalikan Promise yang selesai saat dialog ditutup.
+ */
 function modal(opts){
   return new Promise(function(resolve){
-    const root = document.createElement('div');
+    if (_modalResolve) closeModal(null);
+    _modalResolve = resolve;
+    const stale = $('#modal-root');
+    const root = stale.cloneNode(false);
+    stale.replaceWith(root);
     root.innerHTML =
       '<div class="scrim" data-scrim>' +
-        '<div class="modal ' + (opts.wide ? 'wide' : '') + '" tabindex="-1" role="dialog" aria-modal="true" aria-label="' + esc(opts.title || '') + '">' +
+        '<div class="modal ' + (opts.wide ? 'wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(opts.title || '') + '">' +
           '<div class="modal-head"><h2>' + esc(opts.title || '') + '</h2><div class="spacer"></div>' +
             '<button class="btn btn-ghost btn-sm" data-close aria-label="Tutup">✕</button></div>' +
           '<div class="modal-body">' + (opts.body || '') + '</div>' +
           (opts.footer ? '<div class="modal-foot">' + opts.footer + '</div>' : '') +
         '</div>' +
       '</div>';
-    $('#modal-root').appendChild(root);
-    _mstack.push({ el: root, resolve: resolve });
-    _modalResolve = true;
     root.addEventListener('click', function(e){
       if (e.target.hasAttribute('data-scrim') || e.target.closest('[data-close]')) closeModal(null);
     });
     if (opts.onMount) opts.onMount(root);
-    // Layar sentuh: jangan fokus ke kolom ketik, supaya keyboard tidak muncul sendiri.
-    setTimeout(function(){
-      const dlg = root.querySelector('.modal'); if (!dlg) return;
-      const f = IS_TOUCH ? null : root.querySelector('.modal-body input:not([type=file]):not([disabled]),.modal-body textarea');
-      (f || dlg).focus({ preventScroll:true });
-    }, 30);
+    const first = root.querySelector('[autofocus],input,select,textarea,button');
+    if (first) setTimeout(function(){ first.focus(); }, 30);
   });
 }
 function confirmDialog(title, message, okLabel, danger){
@@ -1417,7 +1352,7 @@ function promptDialog(title, label, opts){
   return modal({
     title: title,
     body: '<div class="field"><label for="pv">' + esc(label) + '</label>' +
-          '<input class="input" id="pv" value="' + esc(opts.value || '') + '" ' +
+          '<input class="input" id="pv" autofocus value="' + esc(opts.value || '') + '" ' +
           (opts.numeric ? 'inputmode="numeric"' : '') + '>' +
           (opts.hint ? '<div class="hint">' + esc(opts.hint) + '</div>' : '') + '</div>',
     footer: '<button class="btn" data-close>Batal</button><button class="btn btn-primary" data-ok>Simpan</button>',
@@ -1442,7 +1377,7 @@ async function requireApproval(permKey, reasonLabel){
     eligible.map(function(u){ return '<option value="' + esc(u.id) + '">' + esc(u.name) + ' — ' + esc(ROLES[u.role].label) + '</option>'; }).join('') +
     '</select></div>' +
     '<div class="field" style="margin-top:12px"><label for="ap">PIN</label>' +
-    '<input class="input" id="ap" type="password" inputmode="numeric" autocomplete="off"></div>' +
+    '<input class="input" id="ap" type="password" inputmode="numeric" autocomplete="off" autofocus></div>' +
     '<div class="err" id="ae" hidden></div>';
   const res = await modal({
     title: 'Persetujuan diperlukan',
@@ -1492,7 +1427,6 @@ function authShell(inner){
   const wrap = $('#lock');
   wrap.hidden = false;
   wrap.innerHTML = '<div class="lock"><div class="lock-card">' + inner + '</div></div>';
-  if (!IS_TOUCH){ const f = wrap.querySelector('input'); if (f) f.focus(); }   // keyboard fisik saja
   return wrap;
 }
 
@@ -1510,7 +1444,7 @@ function renderAuth(message, bad){
     authShell(
       '<h1>Siapkan toko</h1>' +
       '<p class="small muted" style="margin:6px 0 18px">Akun pertama menjadi pemilik. Karyawan lain ditambahkan nanti lewat Pengaturan.</p>' +
-      '<div class="field"><label for="fs">Nama usaha</label><input class="input" id="fs" placeholder="Warung Bu Tini"></div>' +
+      '<div class="field"><label for="fs">Nama usaha</label><input class="input" id="fs" autofocus placeholder="Warung Bu Tini"></div>' +
       '<div class="field" style="margin-top:12px"><label for="fn">Nama Anda</label><input class="input" id="fn" placeholder="Tini"></div>' +
       '<div class="field" style="margin-top:12px"><label for="fe2">Email</label><input class="input" id="fe2" type="email" autocomplete="username" placeholder="nama@email.com"></div>' +
       '<div class="field" style="margin-top:12px"><label for="fw">Kata sandi</label>' +
@@ -1534,7 +1468,7 @@ function renderAuth(message, bad){
     '<h1>Masuk</h1>' +
     '<p class="small muted" style="margin:6px 0 18px">Data toko tersimpan di server, jadi Anda bisa masuk dari perangkat mana saja.</p>' +
     '<div class="field"><label for="le">Email</label>' +
-    '<input class="input" id="le" type="email" autocomplete="username" value="' +
+    '<input class="input" id="le" type="email" autocomplete="username" autofocus value="' +
       esc(localStorage.getItem('kasir.lastEmail') || '') + '"></div>' +
     '<div class="field" style="margin-top:12px"><label for="lw">Kata sandi</label>' +
     '<input class="input" id="lw" type="password" autocomplete="current-password"></div>' +
@@ -1810,9 +1744,6 @@ function setHeader(title, sub, extraHTML){
 }
 
 function renderView(){
-  const act = document.activeElement;
-  const keep = (act && act.id && /^(INPUT|TEXTAREA)$/.test(act.tagName) && act.closest('#view'))
-    ? { id: act.id, s: act.selectionStart, e: act.selectionEnd } : null;
   // Setiap halaman memasang listener pada wadahnya sendiri. Simpul lama diganti
   // dengan simpul kosong agar listener dari halaman sebelumnya ikut terbuang —
   // kalau tidak, satu klik bisa terpanggil berkali-kali setelah beberapa kali pindah menu.
@@ -1825,11 +1756,7 @@ function renderView(){
     shift: viewShift, printer: viewPrinter, reports: viewReports,
     settings: viewSettings, tests: viewTests
   };
-  const done = (map[App.view] || viewPOS)(v);
-  if (keep) Promise.resolve(done).then(function(){
-    const n = document.getElementById(keep.id);
-    if (n && n !== document.activeElement){ n.focus({ preventScroll:true }); try { n.setSelectionRange(keep.s, keep.e); } catch(e){} }
-  });
+  (map[App.view] || viewPOS)(v);
 }
 function go(view){
   App.view = view;
@@ -1877,7 +1804,6 @@ function viewPOS(root){
       '<aside class="card cart">' +
         '<div class="card-head"><h2>Keranjang</h2><span class="pill" id="cart-count">0 item</span>' +
         '<button class="btn btn-ghost btn-sm" data-clearcart title="Kosongkan">🗑</button></div>' +
-        '<div class="seg" id="cart-types"></div>' +
         '<div class="cart-items" id="cart-items"></div>' +
         '<div id="cart-foot"></div>' +
       '</aside>' +
@@ -1942,8 +1868,7 @@ function renderPosGrid(){
       else if (avail <= rp) cls = 'low';
     }
     const blocked = p.trackStock && avail <= 0 && !App.settings.allowNegativeStock;
-    return '<button class="prod' + (inCart ? ' in' : '') + '" data-add="' + esc(p.id) + '" ' + (blocked ? 'disabled' : '') + '>' +
-      (inCart ? '<span class="qb">' + qtyText(inCart) + '</span>' : '') +
+    return '<button class="prod" data-add="' + esc(p.id) + '" ' + (blocked ? 'disabled' : '') + '>' +
       '<span class="pn">' + esc(p.name) + '</span>' +
       '<span class="pp">' + Money.rp(p.price) + '</span>' +
       '<span class="ps ' + cls + '">' + esc(stockTxt) + '</span></button>';
@@ -1986,10 +1911,6 @@ function setQty(lineId, qty){
 
 function renderCart(){
   const box = $('#cart-items'); if (!box) return;
-  const ty = $('#cart-types');
-  if (ty) ty.innerHTML = (App.settings.orderTypes || []).map(function(x){
-    return '<button type="button" data-otype="' + esc(x) + '" aria-pressed="' + (App.cartMeta.orderType === x) + '">' + esc(x) + '</button>';
-  }).join('');
   const cnt = $('#cart-count');
   if (cnt) cnt.textContent = App.cart.reduce(function(a,c){ return a+c.qty; },0).toLocaleString('id-ID') + ' item';
 
@@ -2051,36 +1972,38 @@ async function openPayment(){
   const methods = App.settings.paymentMethods;
   let rows = [{ method:'Tunai', amount:0, ref:'' }];
 
-  const saleUuid = uid();   // satu kali per dialog: bayar ulang setelah sinyal putus tidak membuat nota ganda
-  const cands = [1000,5000,10000,20000,50000,100000].map(function(z){ return Math.ceil(t.grandTotal / z) * z; });
-  const quick = [t.grandTotal].concat(cands.filter(function(v,i){ return v > t.grandTotal && cands.indexOf(v) === i; })
-                .sort(function(x,y){ return x - y; }).slice(0,4));
-  const keys = [1,2,3,4,5,6,7,8,9,'000',0,'⌫'];
-  let act = 0;
+  const quick = [t.grandTotal, 20000, 50000, 100000, 150000, 200000];
   const body =
-    '<div class="paygrid"><div>' +
-      '<div class="row" style="justify-content:space-between;font-size:20px;font-weight:680;margin-bottom:12px">' +
-        '<span>Total tagihan</span><span class="money">' + Money.rp(t.grandTotal) + '</span></div>' +
-      '<div id="pay-rows"></div>' +
-      '<button class="btn btn-sm" id="pay-add" type="button">+ Bayar dengan 2 metode</button>' +
-      '<div class="totals" style="margin-top:14px;border-radius:10px">' +
-        '<div class="tl"><span>Dibayar</span><span class="money" id="pay-paid">0</span></div>' +
-        '<div class="tl grand"><span id="pay-diff-label">Kurang</span><span class="money" id="pay-diff">0</span></div></div>' +
-      '<div class="err" id="pay-err" hidden style="margin-top:10px"></div>' +
-    '</div><div>' +
-      '<div class="pm" id="pay-quick">' + quick.map(function(v,i){
-        return '<button type="button" data-quick="' + v + '">' + (i === 0 ? 'Uang pas' : Money.plain(v)) + '</button>'; }).join('') +
-        '<button type="button" data-clr>Hapus</button></div>' +
-      '<div class="npad">' + keys.map(function(k){
-        return k === '⌫' ? '<button type="button" data-bs aria-label="Hapus satu angka">⌫</button>'
-                         : '<button type="button" data-d="' + k + '">' + k + '</button>'; }).join('') + '</div>' +
-    '</div></div>';
+    '<div class="row" style="justify-content:space-between;font-size:20px;font-weight:680;margin-bottom:14px">' +
+      '<span>Total tagihan</span><span class="money">' + Money.rp(t.grandTotal) + '</span></div>' +
+    '<div id="pay-rows"></div>' +
+    '<button class="btn btn-sm" id="pay-add" style="margin-top:10px">+ Tambah metode (bayar terpisah)</button>' +
+    '<div class="row wrap" style="margin-top:14px" id="pay-quick">' +
+      quick.map(function(v,i){ return '<button class="btn btn-sm" data-quick="' + v + '">' + (i===0 ? 'Uang pas' : Money.plain(v)) + '</button>'; }).join('') +
+    '</div>' +
+    '<div class="totals" style="margin-top:16px;border-radius:10px">' +
+      '<div class="tl"><span>Dibayar</span><span class="money" id="pay-paid">0</span></div>' +
+      '<div class="tl grand"><span id="pay-diff-label">Kurang</span><span class="money" id="pay-diff">0</span></div>' +
+    '</div>' +
+    '<div class="err" id="pay-err" hidden style="margin-top:10px"></div>';
 
   await modal({
-    title: 'Pembayaran', wide: true, body: body,
+    title: 'Pembayaran', body: body,
     footer: '<button class="btn" data-close>Batal</button>' +
             '<button class="btn btn-primary btn-lg" id="pay-go">Selesaikan</button>',
     onMount: function(root){
+      const draw = function(){
+        root.querySelector('#pay-rows').innerHTML = rows.map(function(r,i){
+          return '<div class="row" style="margin-bottom:8px" data-r="' + i + '">' +
+            '<select class="input" data-m style="flex:1 1 130px">' +
+              methods.map(function(m){ return '<option ' + (m===r.method?'selected':'') + '>' + esc(m) + '</option>'; }).join('') +
+            '</select>' +
+            '<input class="input money" data-a inputmode="numeric" style="flex:1 1 110px" value="' + (r.amount ? Money.plain(r.amount) : '') + '" placeholder="0">' +
+            (rows.length > 1 ? '<button class="btn btn-ghost btn-sm" data-x>✕</button>' : '') +
+          '</div>';
+        }).join('');
+        recalc();
+      };
       const recalc = function(){
         const paid = rows.reduce(function(a,r){ return a + r.amount; }, 0);
         const diff = paid - t.grandTotal;
@@ -2088,38 +2011,25 @@ async function openPayment(){
         root.querySelector('#pay-diff-label').textContent = diff >= 0 ? 'Kembalian' : 'Kurang';
         root.querySelector('#pay-diff').textContent = Money.plain(Math.abs(diff));
       };
-      const draw = function(){
-        root.querySelector('#pay-rows').innerHTML = rows.map(function(r,i){
-          return '<div class="payrow' + (i === act ? ' on' : '') + '" data-r="' + i + '">' +
-            '<div class="pm">' + methods.map(function(m){
-              return '<button type="button" data-m="' + esc(m) + '" aria-pressed="' + (m === r.method) + '">' + esc(m) + '</button>'; }).join('') + '</div>' +
-            '<div class="payamt"><span class="muted">Rp</span><b class="money">' + (r.amount ? Money.plain(r.amount) : '0') + '</b>' +
-            (rows.length > 1 ? '<button type="button" class="btn btn-ghost btn-sm" data-x aria-label="Hapus metode">✕</button>' : '') + '</div></div>';
-        }).join('');
-        recalc();
-      };
-      root.addEventListener('click', function(e){
-        const rowEl = e.target.closest('[data-r]');
-        if (e.target.closest('[data-x]')){ rows.splice(+rowEl.dataset.r, 1); act = 0; draw(); return; }
-        if (rowEl){
-          const i = +rowEl.dataset.r; act = i;
-          const m = e.target.closest('[data-m]');
-          if (m){
-            rows[i].method = m.dataset.m;
-            if (m.dataset.m !== 'Tunai' && !rows[i].amount){   // non-tunai: isi sisa tagihan otomatis
-              const others = rows.reduce(function(a,r,j){ return j === i ? a : a + r.amount; }, 0);
-              rows[i].amount = Math.max(0, t.grandTotal - others);
-            }
-          }
-          draw(); return;
+      root.addEventListener('input', function(e){
+        const wrap = e.target.closest('[data-r]'); if (!wrap) return;
+        const i = +wrap.dataset.r;
+        if (e.target.hasAttribute('data-a')){
+          rows[i].amount = Money.parse(e.target.value);
+          e.target.value = rows[i].amount ? Money.plain(rows[i].amount) : '';
+          recalc();
         }
+      });
+      root.addEventListener('change', function(e){
+        const wrap = e.target.closest('[data-r]'); if (!wrap) return;
+        if (e.target.hasAttribute('data-m')) rows[+wrap.dataset.r].method = e.target.value;
+      });
+      root.addEventListener('click', function(e){
+        const x = e.target.closest('[data-x]');
+        if (x){ rows.splice(+x.closest('[data-r]').dataset.r, 1); draw(); return; }
         const q = e.target.closest('[data-quick]');
-        if (q){ rows[act].amount = Money.int(q.dataset.quick); draw(); return; }
-        const d = e.target.closest('[data-d]');
-        if (d){ rows[act].amount = Math.min(999999999, rows[act].amount * Math.pow(10, d.dataset.d.length) + Number(d.dataset.d)); draw(); return; }
-        if (e.target.closest('[data-bs]')){ rows[act].amount = Math.floor(rows[act].amount / 10); draw(); return; }
-        if (e.target.closest('[data-clr]')){ rows[act].amount = 0; draw(); return; }
-        if (e.target.closest('#pay-add')){ rows.push({ method: methods[1] || 'Tunai', amount:0, ref:'' }); act = rows.length - 1; draw(); return; }
+        if (q){ rows[0].amount = Money.int(q.dataset.quick); draw(); return; }
+        if (e.target.closest('#pay-add')){ rows.push({ method: methods[1] || 'Tunai', amount:0, ref:'' }); draw(); return; }
       });
       root.querySelector('#pay-go').addEventListener('click', async function(){
         const btn = this;
@@ -2128,7 +2038,7 @@ async function openPayment(){
         btn.disabled = true; btn.textContent = 'Menyimpan…';
         try {
           const res = await createSale({
-            clientUuid: saleUuid,
+            clientUuid: uid(),
             items: App.cart.map(function(c){ return { productId:c.productId, name:c.name, price:c.price, qty:c.qty, discount:c.discount }; }),
             payments: rows,
             discountBp: App.cartMeta.discountBp,
@@ -2143,6 +2053,7 @@ async function openPayment(){
           await refreshCaches();
           closeModal(true);
           renderView();
+          toast('Nota ' + res.order.no + ' tersimpan. Kembalian ' + Money.rp(res.order.change) + '.');
           autoPrint(res.order);
           showReceipt(res.order);
         } catch (ex){
@@ -2478,16 +2389,12 @@ function autoPrint(order){
 function showReceipt(order){
   const btText = PRN.cfg.deviceName ? 'Cetak (' + esc(PRN.cfg.deviceName) + ')' : 'Cetak Bluetooth';
   modal({
-    title: 'Pembayaran berhasil',
-    body: '<div class="done"><div class="ok">✓</div><div class="small muted">' + (order.change ? 'Kembalian' : 'Uang pas') + '</div>' +
-          (order.change ? '<div class="big money">' + Money.rp(order.change) + '</div>' : '') +
-          '<div class="small muted">Total ' + Money.rp(order.grandTotal) + ' · Nota ' + esc(order.no) + '</div></div>' +
-          '<details><summary class="small muted" style="cursor:pointer;padding:10px 0">Lihat struk</summary>' +
-          '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto">' + receiptHTML(order) + '</div></details>',
-    footer: '<button class="btn" data-copy>Salin teks</button>' +
+    title: 'Struk ' + order.no,
+    body: '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto">' + receiptHTML(order) + '</div>',
+    footer: '<button class="btn" data-close>Tutup</button>' +
+            '<button class="btn" data-copy>Salin teks</button>' +
             '<button class="btn" data-paper>Cetak kertas</button>' +
-            (PRN.supported() ? '<button class="btn" data-bt>' + btText + '</button>' : '') +
-            '<button class="btn btn-primary btn-lg" data-close>Pesanan baru</button>',
+            (PRN.supported() ? '<button class="btn btn-primary" data-bt>' + btText + '</button>' : ''),
     onMount: function(root){
       root.querySelector('[data-paper]').addEventListener('click', function(){ printPaper(order); });
       const bt = root.querySelector('[data-bt]');
@@ -2927,7 +2834,7 @@ async function editProduct(id){
   const v = p || { name:'', sku:'', barcode:'', categoryId:(App.categories[0]||{}).id||'', unit:'pcs',
                    price:0, cost:0, stock:0, reorderPoint:5, trackStock:true, taxable:true, active:true };
   const body =
-    '<div class="field"><label for="xn">Nama produk</label><input class="input" id="xn" value="' + esc(v.name) + '"></div>' +
+    '<div class="field"><label for="xn">Nama produk</label><input class="input" id="xn" value="' + esc(v.name) + '" autofocus></div>' +
     '<div class="row wrap" style="margin-top:12px">' +
       '<div class="field" style="flex:1 1 140px"><label for="xs">SKU</label><input class="input" id="xs" value="' + esc(v.sku) + '" placeholder="otomatis"></div>' +
       '<div class="field" style="flex:1 1 140px"><label for="xb">Barcode</label><input class="input" id="xb" value="' + esc(v.barcode) + '"></div>' +
@@ -3005,7 +2912,7 @@ async function editProduct(id){
           }
           await t.done;
         } else {
-          await patchProduct(rec);
+          await dbPut('products', rec);
         }
         await refreshCaches(); closeModal(true); renderView();
         toast(isNew ? 'Produk ditambahkan.' : 'Perubahan tersimpan.');
@@ -3137,7 +3044,7 @@ async function importProducts(){
           if (old){
             const rec = Object.assign({}, old, { name:r.name, barcode:r.barcode, categoryId:catId || old.categoryId,
               unit:r.unit, price:r.price, cost:r.cost, reorderPoint:r.reorder, trackStock:r.track, active:r.active });
-            await patchProduct(rec); updated++;
+            t.products.put(rec); updated++;
           } else {
             const rec = { id:uid(), sku:sku, name:r.name, barcode:r.barcode, categoryId:catId || (App.categories[0]||{}).id || '',
               unit:r.unit, price:r.price, cost:r.cost, stock:r.track ? r.stock : 0, reorderPoint:r.reorder,
@@ -3269,7 +3176,7 @@ async function adjustDialog(productId){
       '<option value="WASTE">Rusak atau terbuang</option>' +
       '<option value="OPNAME">Stok opname (set jumlah akhir)</option>' +
     '</select></div>' +
-    '<div class="field" style="margin-top:12px"><label for="aq" id="aql">Jumlah masuk</label><input class="input" id="aq" inputmode="decimal" value=""></div>' +
+    '<div class="field" style="margin-top:12px"><label for="aq" id="aql">Jumlah masuk</label><input class="input" id="aq" inputmode="decimal" value="" autofocus></div>' +
     '<div class="field" style="margin-top:12px" id="acw"><label for="ac">Harga beli per satuan</label>' +
       '<input class="input money" id="ac" inputmode="numeric" placeholder="kosongkan jika tidak berubah">' +
       '<div class="hint">Diisi = HPP diperbarui memakai rata-rata bergerak.</div></div>' +
@@ -3388,7 +3295,7 @@ async function viewShift(root){
 async function openShiftDialog(){
   const body =
     '<div class="field"><label for="sf">Modal awal di laci</label>' +
-    '<input class="input money" id="sf" inputmode="numeric" value="0"></div>' +
+    '<input class="input money" id="sf" inputmode="numeric" value="0" autofocus></div>' +
     '<div class="hint" style="margin-top:8px">Hitung uang fisik di laci sekarang. Angka ini jadi dasar perhitungan saat tutup shift.</div>';
   await modal({
     title: 'Buka shift', body: body,
@@ -3410,7 +3317,7 @@ async function openShiftDialog(){
 async function cashDialog(type){
   const cats = App.settings.cashCategories;
   const body =
-    '<div class="field"><label for="ca">Jumlah</label><input class="input money" id="ca" inputmode="numeric" value=""></div>' +
+    '<div class="field"><label for="ca">Jumlah</label><input class="input money" id="ca" inputmode="numeric" value="" autofocus></div>' +
     '<div class="field" style="margin-top:12px"><label for="cc">Kategori</label><select class="input" id="cc">' +
       cats.map(function(c){ return '<option>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
     '<div class="field" style="margin-top:12px"><label for="cn">Catatan</label><input class="input" id="cn"></div>';
@@ -3446,7 +3353,7 @@ async function closeShiftDialog(){
       '<div class="tl grand"><span>Seharusnya ada di laci</span><span class="money">' + Money.plain(sum.expectedCash) + '</span></div>' +
     '</div>' +
     '<div class="field"><label for="cz">Hitung uang fisik di laci sekarang</label>' +
-    '<input class="input money" id="cz" inputmode="numeric" value="" placeholder="0"></div>' +
+    '<input class="input money" id="cz" inputmode="numeric" value="" autofocus placeholder="0"></div>' +
     '<div id="czd" style="margin-top:12px"></div>' +
     '<div class="field" style="margin-top:12px"><label for="cnote">Catatan penutupan</label><input class="input" id="cnote" placeholder="Penjelasan selisih, bila ada"></div>';
   await modal({
@@ -3513,7 +3420,6 @@ async function viewReports(root){
     byCashier[o.cashierName].omzet += net;
     byCashier[o.cashierName].txn++;
     o.payments.forEach(function(p){ byMethod[p.method] = (byMethod[p.method] || 0) + p.amount; });
-    if (o.change && byMethod['Tunai'] != null) byMethod['Tunai'] -= o.change;
     o.items.forEach(function(i){
       const soldQty = i.qty - (i.refundedQty || 0);
       const lineNet = Money.int((i.lineTotal - (i.orderDiscountShare||0)) * (i.qty > 0 ? soldQty / i.qty : 0));
@@ -3894,7 +3800,7 @@ async function editUser(id){
   const isNew = !u;
   const isSelf = u && u.id === App.user.id;
   const body =
-    '<div class="field"><label for="un">Nama</label><input class="input" id="un" value="' + esc(u ? u.name : '') + '"></div>' +
+    '<div class="field"><label for="un">Nama</label><input class="input" id="un" value="' + esc(u ? u.name : '') + '" autofocus></div>' +
     (isNew
       ? '<div class="field" style="margin-top:12px"><label for="uem">Email untuk masuk</label>' +
         '<input class="input" id="uem" type="email" autocomplete="off" placeholder="kasir@email.com"></div>' +
@@ -4343,13 +4249,10 @@ document.addEventListener('click', function(e){
   if (add){ addToCart(add.dataset.add); return; }
   const cat = e.target.closest('[data-cat]');
   if (cat){ App.posFilter.categoryId = cat.dataset.cat; renderPosCats(); renderPosGrid(); return; }
-  const ot = e.target.closest('[data-otype]');
-  if (ot){ App.cartMeta.orderType = App.cartMeta.orderType === ot.dataset.otype ? '' : ot.dataset.otype; renderCart(); return; }
   const ci = e.target.closest('.ci');
   if (ci){
     const id = ci.dataset.line;
     const line = App.cart.find(function(c){ return c.lineId === id; });
-    if (!line) return;
     if (e.target.closest('[data-inc]')) return setQty(id, line.qty + 1);
     if (e.target.closest('[data-dec]')) return setQty(id, line.qty - 1);
     if (e.target.closest('[data-rm]'))  return setQty(id, 0);
